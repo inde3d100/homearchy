@@ -272,10 +272,10 @@ const (
 // wlrootsScrollAtCursor emits the scroll on the wlroots virtual pointer, with
 // modifiers held on the virtual keyboard (libei on KDE) for its duration.
 //
-// Both halves go out through the same seat, which is the whole reason a
-// modified scroll is routed here rather than through the faster uinput batch.
-// The release only lets go of what this call pressed, so a modifier the user is
-// physically holding survives it.
+// Both halves go out through the same seat. The injection pointer is aimed at
+// the physical cursor first so the compositor has a pointer-enter to deliver
+// the axis to. The release only lets go of what this call pressed, so a
+// modifier the user is physically holding survives it.
 func wlrootsScrollAtCursor(deltaX, deltaY int, modifiers action.Modifiers) error {
 	if os.Getenv("WAYLAND_DISPLAY") == "" {
 		return derrors.New(
@@ -284,7 +284,12 @@ func wlrootsScrollAtCursor(deltaX, deltaY int, modifiers action.Modifiers) error
 		)
 	}
 
-	err := wlrootsPressModifiers(modifiers)
+	err := linux.WaylandAimVirtualPointerAtCursor()
+	if err != nil {
+		return err
+	}
+
+	err = wlrootsPressModifiers(modifiers)
 	if err != nil {
 		return err
 	}
@@ -339,6 +344,11 @@ func waylandScrollBackendAvailable() error {
 
 func newWaylandScrollSession(modifiers action.Modifiers) (scrollSession, error) {
 	err := waylandScrollBackendAvailable()
+	if err != nil {
+		return nil, err
+	}
+
+	err = linux.WaylandAimVirtualPointerAtCursor()
 	if err != nil {
 		return nil, err
 	}

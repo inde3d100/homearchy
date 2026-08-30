@@ -5,8 +5,11 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/y3owk1n/neru/internal/app/components"
+	"github.com/y3owk1n/neru/internal/app/components/scroll"
 	"github.com/y3owk1n/neru/internal/domain"
 	"github.com/y3owk1n/neru/internal/domain/state"
+	portmocks "github.com/y3owk1n/neru/internal/ports/mocks"
 )
 
 func TestScrollMode_ModeType(t *testing.T) {
@@ -59,5 +62,40 @@ func TestScrollMode_HandleKey_DoesNothing(t *testing.T) {
 
 	if got := appState.CurrentMode(); got != domain.ModeScroll {
 		t.Fatalf("mode after an unbound key = %v, want %v", got, domain.ModeScroll)
+	}
+}
+
+// TestStartInteractiveScroll_DoesNotReenterWhenAlreadyActive pins the dual-bind
+// window: Hyprland and the engine [hotkeys] table both fire "scroll" a few
+// milliseconds apart. A second enter used to restart the event tap, so j/k
+// typed in the re-grab gap went to the focused app.
+func TestStartInteractiveScroll_DoesNotReenterWhenAlreadyActive(t *testing.T) {
+	overlay := &portmocks.MockOverlayPort{}
+	appState := state.NewAppState()
+	appState.SetMode(domain.ModeScroll)
+
+	scrollCtx := &scroll.Context{}
+	scrollCtx.SetIsActive(true)
+
+	handler := newHandlerWithState(handlerState{
+		logger:      zap.NewNop(),
+		appState:    appState,
+		cursorState: state.NewCursorState(),
+		overlayPort: overlay,
+		scroll:      &components.ScrollComponent{Context: scrollCtx},
+	})
+
+	handler.startInteractiveScroll()
+
+	if got := overlay.Frames(); len(got) != 0 {
+		t.Fatalf("re-entering scroll put %d frame(s) on screen, want none", len(got))
+	}
+
+	if !handler.scroll.Context.IsActive() {
+		t.Fatal("re-entering scroll cleared the active context")
+	}
+
+	if got := handler.appState.CurrentMode(); got != domain.ModeScroll {
+		t.Fatalf("mode after a duplicate enter = %v, want %v", got, domain.ModeScroll)
 	}
 }

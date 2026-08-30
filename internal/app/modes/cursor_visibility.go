@@ -1,6 +1,7 @@
 package modes
 
 import (
+	"runtime"
 	"time"
 
 	"github.com/y3owk1n/neru/internal/domain"
@@ -67,6 +68,13 @@ func (h *handlerState) stopCursorOverlayPollingIfIdle() {
 
 func (h *handlerState) shouldPollCursorOverlays(mode domain.Mode) bool {
 	if h.config == nil {
+		return false
+	}
+
+	// Linux paints the scroll badge on the shared fullscreen overlay. Mapping
+	// that layer on Hyprland steals pointer focus from the window j/k should
+	// scroll, so scroll mode keeps the overlay unmapped.
+	if mode == domain.ModeScroll && runtime.GOOS == "linux" {
 		return false
 	}
 

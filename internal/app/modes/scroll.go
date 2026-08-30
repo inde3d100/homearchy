@@ -12,6 +12,17 @@ import (
 // StartInteractiveScroll activates the interactive scroll mode,
 // showing the scroll overlay and enabling key handling for scrolling.
 func (h *handlerState) startInteractiveScroll() {
+	// Super+Z is bound both in Hyprland (`bin/homearchy scroll`) and in the
+	// engine [hotkeys] table. The two fires land a few milliseconds apart; a
+	// second enter tears the event tap down and the re-grab is ~200ms late, so
+	// j/k typed in that window go to the focused app. --toggle is answered
+	// before a mode is reached, so a chord that is not a toggle must be a no-op
+	// when scroll is already up.
+	if h.appState.CurrentMode() == domain.ModeScroll && h.scroll.Context.IsActive() {
+		h.logger.Debug("Scroll mode already active")
+		return
+	}
+
 	h.prepareForModeActivation()
 	h.cursorState.SkipNextRestore()
 

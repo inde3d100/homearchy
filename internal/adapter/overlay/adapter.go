@@ -106,7 +106,14 @@ func (a *Adapter) ShowFrame(ctx context.Context, frame ports.Frame) error {
 
 	a.clearSurfacesTheFrameDoesNotOwn(frame)
 
-	if drawsOnSharedWindow(frame) {
+	if frame.Mode() == domain.ModeScroll {
+		// Scroll injects axis at the window under the cursor. Hyprland
+		// hit-tests overlay layers before windows, so mapping the shared
+		// surface — even with an empty input region — is what made j/k a
+		// no-op until a real pointer moved. SwitchTo below still names the
+		// mode for backends that paint indicators on their own windows.
+		a.manager.Hide()
+	} else if drawsOnSharedWindow(frame) {
 		a.manager.ResizeToActiveScreen()
 		a.manager.Show()
 	}
@@ -124,11 +131,10 @@ func (a *Adapter) ShowFrame(ctx context.Context, frame ports.Frame) error {
 // spanning window up. Bringing it up here would put a transparent
 // always-on-top window behind the panels that nothing draws into.
 //
-// Scroll draws no content of its own but still needs the window, because on
-// Linux the mode and sticky-modifier indicators are badges painted on that
-// surface: the shared window's visibility is theirs. Deciding otherwise would
-// encode macOS's one-window-per-indicator model in shared code and leave a
-// Linux user in scroll mode with no indicator after a monitor move.
+// Scroll draws no content of its own and must not map the shared window:
+// a fullscreen overlay layer steals Hyprland pointer focus from the window
+// j/k should scroll. macOS paints the mode badge on a dedicated window,
+// which SwitchTo still names.
 //
 // Every mode is named rather than defaulted, so a mode added without an answer
 // here fails the `exhaustive` linter instead of silently inheriting one. The
@@ -136,10 +142,10 @@ func (a *Adapter) ShowFrame(ctx context.Context, frame ports.Frame) error {
 // unreachable in a lint-clean tree.
 func drawsOnSharedWindow(frame ports.Frame) bool {
 	switch frame.Mode() {
-	case domain.ModeMonitorSelect:
+	case domain.ModeMonitorSelect, domain.ModeScroll:
 		return false
 	case domain.ModeHints, domain.ModeGrid, domain.ModeRecursiveGrid,
-		domain.ModeScroll, domain.ModeIdle:
+		domain.ModeIdle:
 		return true
 	}
 
@@ -834,10 +840,9 @@ func (a *Adapter) hideMonitorSelect() {
 }
 
 // drawScroll draws a scroll frame, which has nothing of its own to draw.
-// Coming up it still clears the shared surface: scroll puts no content there,
-// so whatever the previous mode left would stay on screen under the scroll
-// indicator. The window is up by then and empty either way, so there is
-// nothing for the clear to blink out.
+// Coming up it still clears the shared surface so a previous mode's grid or
+// hints cannot stay on screen. The window itself stays hidden: mapping it
+// would sit above the window the axis has to reach.
 func (a *Adapter) drawScroll(kind drawKind) error {
 	if kind == transitionDraw {
 		a.manager.Clear()

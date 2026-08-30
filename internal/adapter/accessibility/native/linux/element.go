@@ -8,7 +8,6 @@ import (
 
 	"go.uber.org/zap"
 
-	eventtaplinux "github.com/y3owk1n/neru/internal/adapter/eventtap/linux"
 	"github.com/y3owk1n/neru/internal/adapter/platform"
 	"github.com/y3owk1n/neru/internal/adapter/platform/mousestate"
 	"github.com/y3owk1n/neru/internal/config"
@@ -428,13 +427,12 @@ const scrollPixelsPerNotch = 30
 // ScrollAtCursor scrolls at the cursor, presenting modifiers as held.
 //
 // Linux has no event-flags concept, so a modifier is a real key press around
-// the scroll. On Wayland that forces a choice of injection layer: the modifier
-// can only be pressed on the wlroots virtual keyboard (or libei on KDE), while
-// the fast path for the scroll itself is the uinput evdev device. Interleaving
-// the two leaves the compositor to merge seat state across devices, which it is
-// not obliged to do — so a modified scroll goes out entirely through
-// wlroots/libei and skips the uinput batch. That costs throughput on a large
-// modified scroll and buys a modifier that actually arrives.
+// the scroll. On Wayland both the modifier and the axis go out through the
+// same seat (zwlr_virtual_pointer / virtual keyboard, or libei on KWin). A
+// wheel-only uinput device can look like it delivered — the kernel write
+// succeeds — while the compositor drops the axis until some other pointer has
+// established focus, which is why a touchpad flick made the next scroll
+// "work". X11 still uses the uinput/XTest batch.
 //
 // With smooth_scroll.enabled the scroll is handed to the animator instead and
 // arrives as a sequence of eased chunks, which is what the same setting does on
@@ -482,79 +480,11 @@ func scrollAtCursorNow(deltaX, deltaY int, modifiers action.Modifiers) error {
 	}
 
 	if currentLinuxBackend() == linuxBackendWayland {
-		if modifiers != 0 {
-			// Uncapped, unlike the X11 path's 50-click ceiling, because this
-			// is the same event count the uinput batch below would send for
-			// the same delta — the events are merely slower per round trip.
-			// Capping here would make a modified go_bottom travel a different
-			// distance from an unmodified one, which is worse than slow.
-			return wlrootsScrollAtCursor(deltaX, deltaY, modifiers)
-		}
-
-		// Scale factor: each uinput scroll event approximates ~1 line.
-		const scrollScale = scrollPixelsPerNotch
-
-		// maxBatchEvents caps the number of uinput events sent per
-		// write/flush to avoid overflowing the kernel evdev buffer (~8192
-		// bytes) or the Wayland socket buffer.  Each batch is kept small so
-		// the compositor and client can process events incrementally.
-		const maxBatchEvents = 50
-
-		sendScaledScroll := func(axis int, delta int) int {
-			if delta == 0 {
-				return 0
-			}
-
-			totalNotches := abs(delta) / scrollScale
-			if totalNotches == 0 {
-				totalNotches = 1
-			}
-
-			remainingNotches := totalNotches
-			batch := make([]int, 0, maxBatchEvents)
-
-			value := 1
-			if delta < 0 {
-				value = -1
-			}
-
-			for remainingNotches > 0 {
-				batch = append(batch, value)
-				remainingNotches--
-
-				if len(batch) >= maxBatchEvents || remainingNotches == 0 {
-					err := eventtaplinux.ScrollDeviceScrollBatch(axis, batch)
-					if err != nil {
-						// uinput unavailable — add back unsent notches so the
-						// remaining delta is retried via wlroots virtual pointer
-						// fallback without double-counting already-sent notches.
-						remainingNotches += len(batch)
-
-						break
-					}
-
-					batch = batch[:0]
-				}
-			}
-
-			notchesSent := totalNotches - remainingNotches
-
-			pixelsSent := notchesSent * scrollScale
-			if delta > 0 {
-				return max(delta-pixelsSent, 0)
-			}
-
-			return min(delta+pixelsSent, 0)
-		}
-
-		remainY := sendScaledScroll(0, deltaY)
-		remainX := sendScaledScroll(1, deltaX)
-
-		if remainY == 0 && remainX == 0 {
-			return nil
-		}
-
-		return wlrootsScrollAtCursor(remainX, remainY, 0)
+		// Uncapped, unlike the X11 path's 50-click ceiling: the virtual-pointer
+		// batch is the same event count a uinput batch would send, merely
+		// slower per round trip. Capping here would make go_bottom travel a
+		// different distance depending on modifiers, which is worse than slow.
+		return wlrootsScrollAtCursor(deltaX, deltaY, modifiers)
 	}
 
 	// No backend to inject through. An unmodified scroll has always been a
