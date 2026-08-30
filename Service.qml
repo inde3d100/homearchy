@@ -60,8 +60,8 @@ Item {
       "\"Super+Shift+H\" = \"hints --action left_click\"\n" +
       "\"Super+Shift+U\" = \"hints --search --action left_click\"\n" +
       "\"Super+Shift+J\" = \"grid --action left_click\"\n" +
-      "\"Super+D\" = \"recursive_grid --action left_click\"\n" +
-      "\"Super+Z\" = \"scroll\"\n" +
+      "\"Super+Shift+R\" = \"recursive_grid --action left_click\"\n" +
+      "\"Super+Shift+Z\" = \"scroll\"\n" +
       "\"Super+Shift+I\" = \"monitor_select\"\n" +
       "\"Super+Shift+Escape\" = \"idle\"\n\n" +
       "[logging]\n" +

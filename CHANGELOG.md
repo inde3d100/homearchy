@@ -6,6 +6,8 @@
 - Bundled native `arm64` and `amd64` Homearchy engines behind an architecture dispatcher.
 - Added hints, searchable hints, grid, recursive grid, scroll, and monitor-selection controls.
 - Added the idempotent `homearchy-setup` command for managed Hyprland bindings and legacy Neru binding migration.
+- Bound recursive grid to `Super+Shift+R` and scroll to `Super+Shift+Z` so the defaults stay off stock Omarchy Super+letter chords.
+- Documented that the Super shortcuts are configurable in `bindings.lua` and `Service.qml`.
 - Bound `Super+Shift+Escape` as an emergency overlay cancel, and stopped a Wayland capture race that could freeze the session until reboot.
 - Bound `Space` to left-click and `Enter` to right-click in grid and recursive grid, then return to idle.
 - Inverted scroll on Omarchy so vim `j`/`k` match down/up.

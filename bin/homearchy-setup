@@ -20,8 +20,8 @@ BINDINGS = (
     ("SUPER + SHIFT + H", "Homearchy hints", "hints --action left_click"),
     ("SUPER + SHIFT + U", "Homearchy search", "hints --search --action left_click"),
     ("SUPER + SHIFT + J", "Homearchy grid", "grid --action left_click"),
-    ("SUPER + D", "Homearchy recursive grid", "recursive_grid --action left_click"),
-    ("SUPER + Z", "Homearchy scroll", "scroll"),
+    ("SUPER + SHIFT + R", "Homearchy recursive grid", "recursive_grid --action left_click"),
+    ("SUPER + SHIFT + Z", "Homearchy scroll", "scroll"),
     ("SUPER + SHIFT + I", "Homearchy monitor selection", "monitor_select"),
     ("SUPER + SHIFT + ESCAPE", "Homearchy cancel overlay", "idle"),
 )
