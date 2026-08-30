@@ -2,7 +2,13 @@
 
 Keyboard-driven navigation for [Omarchy](https://omarchy.org). Homearchy adds screen-wide hints, search, grid navigation, recursive grid navigation, vim-style scrolling, monitor selection, and an optional Omarchy bar widget.
 
-![Homearchy on the Omarchy desktop](assets/homearchy-popup.png)
+Click the bar icon to open every mode. Hints label buttons in the focused window. Grid covers the whole screen with typeable cells.
+
+![Homearchy bar menu](assets/homearchy-popup.png)
+
+![Homearchy hints](assets/homearchy-hints.png)
+
+![Homearchy grid](assets/homearchy-grid.png)
 
 ## Requirements
 

@@ -9,7 +9,8 @@
 - Bound recursive grid to `Super+Shift+R` and scroll to `Super+Shift+Z` so the defaults stay off stock Omarchy Super+letter chords.
 - Documented that the Super shortcuts are configurable in `bindings.lua` and `Service.qml`.
 - Kept `Super+Enter` as Omarchy's terminal shortcut; Homearchy does not bind it.
-- Replaced the GitHub/marketplace preview with a desktop-wallpaper screenshot.
+- Replaced the GitHub/marketplace preview with a collage of the bar menu, hints overlay, and full grid.
+- Added README screenshots of the bar menu, hints overlay, and full grid.
 - Bound `Super+Shift+Escape` as an emergency overlay cancel, and stopped a Wayland capture race that could freeze the session until reboot.
 - Bound `Space` to left-click and `Enter` to right-click in grid and recursive grid, then return to idle.
 - Inverted scroll on Omarchy so vim `j`/`k` match down/up.
