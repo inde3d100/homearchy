@@ -14,6 +14,7 @@ import tempfile
 
 PLUGIN_ID = "io.github.inde3d100.homearchy"
 START_MARKER = f"-- Homearchy bindings: managed by {PLUGIN_ID}"
+START_MARKER_PREFIX = "-- Homearchy bindings: managed by "
 END_MARKER = "-- End Homearchy bindings"
 BINDINGS = (
     ("SUPER + SHIFT + H", "Homearchy hints", "hints --action left_click"),
@@ -39,7 +40,7 @@ def strip_managed_block(lines: list[str]) -> list[str]:
     inside = False
     found_end = False
     for line in lines:
-        if line.rstrip("\n") == START_MARKER:
+        if line.rstrip("\n").startswith(START_MARKER_PREFIX):
             if inside:
                 raise ValueError("nested Homearchy binding markers")
             inside = True
