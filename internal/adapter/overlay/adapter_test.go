@@ -1351,9 +1351,9 @@ func TestAdapterClearFrame_TakesTheMonitorPanelsDown(t *testing.T) {
 // changes and whatever the previous mode drew comes off the surface, but
 // nothing of scroll's own is drawn on it.
 //
-// The window still comes up, because on Linux the indicators that report the
-// mode are painted on that surface — a hidden window is an invisible
-// indicator.
+// The shared window stays hidden. Mapping it on Wayland puts an overlay
+// layer above the window j/k should scroll, and Hyprland hit-tests that
+// layer first.
 func TestAdapterShowFrame_ScrollTakesTheSurfaceOverWithoutDrawing(t *testing.T) {
 	t.Parallel()
 
@@ -1373,8 +1373,8 @@ func TestAdapterShowFrame_ScrollTakesTheSurfaceOverWithoutDrawing(t *testing.T) 
 		t.Errorf("surface cleared %d times, want 1", manager.cleared)
 	}
 
-	if !manager.visible {
-		t.Error("the overlay the mode indicator is painted on was left hidden")
+	if manager.visible {
+		t.Error("scroll mapped the shared overlay over the window it should scroll")
 	}
 
 	if manager.gridDraws != 0 || len(manager.drawn) != 0 {

@@ -133,10 +133,64 @@ func waylandMoveCursorToPoint(point image.Point) error {
 	return wlrootsSetCursor(point)
 }
 
+func waylandMoveCursorBy(delta image.Point) error {
+	hasVirtualPointer, err := wlrootsHasVirtualPointer()
+	if err != nil {
+		return err
+	}
+
+	if hasVirtualPointer {
+		return wlrootsMoveCursorBy(delta)
+	}
+
+	return nil
+}
+
 func waylandCursorPosition() (image.Point, error) {
 	// The cursor cache lives in the wlroots client for both backends; libei
 	// moves are mirrored into it by waylandMoveCursorToPoint.
 	return wlrootsCursorPosition()
+}
+
+// virtualPointerAimTimeout bounds the compositor-IPC cursor query that aims
+// the injection pointer. This can run on the eventtap goroutine (a j/k in
+// scroll mode), so it must stay short — a hung hyprctl would freeze hotkeys.
+const virtualPointerAimTimeout = 80 * time.Millisecond
+
+// waylandAimVirtualPointerAtCursor warps the injection pointer to the physical
+// cursor so a following axis event is delivered to the window under it.
+//
+// Hyprland's mouseMoveUnified returns immediately when the floored cursor
+// has not moved, so an absolute warp to the hardware position is a no-op and
+// the following axis is delivered to whatever last had pointer focus — often
+// nothing, until a real touchpad move. Hyprland itself forces a hit-test with
+// the same 1px trick in simulateMouseMovement. A relative step then an
+// absolute restore is that trick over zwlr_virtual_pointer.
+func waylandAimVirtualPointerAtCursor() error {
+	ctx, cancel := context.WithTimeout(context.Background(), virtualPointerAimTimeout)
+	defer cancel()
+
+	point, ok := waylandCompositorCursorPosition(ctx)
+	if !ok {
+		cached, err := waylandCursorPosition()
+		if err != nil {
+			// No position to restore to: still nudge so the compositor cannot
+			// skip the hit-test, then put the cursor back.
+			if moveErr := waylandMoveCursorBy(image.Point{X: 1}); moveErr != nil {
+				return nil
+			}
+
+			return waylandMoveCursorBy(image.Point{X: -1})
+		}
+
+		point = cached
+	}
+
+	if err := waylandMoveCursorBy(image.Point{X: 1}); err != nil {
+		return err
+	}
+
+	return waylandMoveCursorToPoint(point)
 }
 
 // waylandRefreshCursorPosition re-learns the physical cursor position after

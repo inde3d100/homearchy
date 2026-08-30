@@ -21,6 +21,14 @@ func WaylandCursorPosition() (image.Point, error) {
 	return waylandCursorPosition()
 }
 
+// WaylandAimVirtualPointerAtCursor warps the injection pointer to the physical
+// cursor so a following axis or button event is delivered to the window under
+// it. Clicks already do this; scroll has to as well — compositors ignore axis
+// events from a virtual pointer that has never sent motion.
+func WaylandAimVirtualPointerAtCursor() error {
+	return waylandAimVirtualPointerAtCursor()
+}
+
 // WaylandClick performs a full click (press + release) at the given position.
 func WaylandClick(point image.Point, button int) error {
 	return waylandClick(point, button)

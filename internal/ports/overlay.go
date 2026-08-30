@@ -165,8 +165,9 @@ func (MonitorSelectFrame) frame() {}
 //
 // It is still a Frame, because entering scroll mode is still a transition —
 // whatever the previous mode drew has to come off the screen, and the overlay
-// has to know which mode it is in so the indicators can name it. Saying that
-// with a Frame is what keeps one path from a mode to the screen.
+// has to know which mode it is in so the indicators can name it. The shared
+// window stays hidden: mapping it on Wayland sits above the window the axis
+// has to reach.
 type ScrollFrame struct{}
 
 // Mode names the mode a scroll frame draws.
