@@ -1,0 +1,17 @@
+# Homearchy Configuration - Grid Only Mode
+
+[hotkeys]
+"Primary+Shift+Space" = "grid"
+"Primary+Shift+S" = "scroll"
+
+[hints]
+enabled = false
+
+[grid]
+enabled = true
+characters = "abcdefghijklmnpqrstuvwxyz"
+prewarm_enabled = true
+enable_gc = false
+
+[recursive_grid]
+enabled = false

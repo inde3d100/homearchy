@@ -1,0 +1,65 @@
+# Binaries
+bin/*
+!bin/homearchy
+!bin/homearchy-setup
+!bin/homearchy-linux-amd64
+!bin/homearchy-linux-arm64
+!bin/SHA256SUMS
+build/
+*.app
+*.dmg
+/homearchy
+/genman
+
+# Generated man pages
+/man/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.syso
+*.test
+*.out
+coverage.txt
+coverage.html
+go.work
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log
+
+# Config (keep default)
+config.toml
+!configs/default-config.toml
+
+.direnv/
+
+# golangci-lint cache. The justfile points it here so every checkout gets its
+# own and none can poison another's — see the GOLANGCI_LINT_CACHE comment there.
+.golangci-cache/
+
+# Agent-guide local overrides (see AGENTS.md)
+AGENTS.local.md
+CLAUDE.local.md
+
+# Agent worktrees: whole checkouts of this repository parked inside it. The rest
+# of .claude/ stays tracked — settings.json, the agent definitions and the
+# skills symlink are pinned by internal/architecture/agent_contract_test.go.
+.claude/worktrees/
+
+__pycache__/
+*.pyc

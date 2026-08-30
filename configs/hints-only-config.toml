@@ -1,0 +1,79 @@
+# Homearchy Configuration - Hints Only Mode
+
+[hotkeys]
+"Primary+Shift+Space" = "hints"
+"Primary+Shift+S" = "scroll"
+
+[hints]
+enabled = true
+max_depth = 50
+include_menubar_hints = true               # Show hints on menubar
+include_dock_hints = true                  # Show hints on Dock and Mission Control
+include_nc_hints = true                    # Show hints on Notification Center
+include_stage_manager_hints = true         # Include stage manager items in hints
+include_pip_hints = true
+include_screen_capture_hints = true
+detect_mission_control = false             # Skip frontmost window hints when Mission Control is active
+additional_menubar_hints_targets = [
+    "com.apple.TextInputMenuAgent",
+    "com.apple.controlcenter",
+    "com.apple.systemuiserver",
+    "io.github.inde3d100.homearchy",
+]
+clickable_roles = [
+    ## Semantic role names. They resolve to each platform's native
+    ## accessibility vocabulary, so this list works on macOS, Linux and Windows.
+    ## Run `homearchy roles` for the full vocabulary and how it resolves here.
+    "button",
+    "menu_button",
+    "popup_button",
+    "combo_box",
+    "checkbox",
+    "radio",
+    "switch",
+    "disclosure",
+    "link",
+    "text_field",
+    "text_area",
+    "slider",
+    "tab",
+    "menu_item",
+    "cell",
+    "row",
+    ## Native roles are addressed through their vocabulary prefix
+    ## (`ax:` macOS, `atspi:` Linux, `uia:` Windows). Entries for other
+    ## platforms are ignored rather than rejected.
+    "ax:AXGenericElement",
+]
+ignore_clickable_check = false
+
+## Application-specific configurations for customizing hint behavior per app.
+## Each entry overrides behavior for one app, matched on `bundle_id`.
+##
+## `bundle_id` is platform-specific (the field name is kept for compatibility):
+##   macOS         -> bundle ID          e.g. "com.brave.Browser"  (osascript -e 'id of app "Brave Browser"')
+##   Linux/X11     -> WM_CLASS class     e.g. "brave-browser"      (xprop WM_CLASS)
+##   Linux/Wayland -> toplevel app_id    e.g. "brave-browser"      (swaymsg -t get_tree / hyprctl activewindow)
+## GNOME/Mutter on Wayland exposes no focused-app source, so per-app config
+## never applies there; GNOME on X11 and all wlroots/KDE Wayland sessions work.
+
+## macOS example:
+# [[hints.app_configs]]
+# bundle_id = "com.brave.Browser"
+# additional_clickable_roles = ["ax:AXTabGroup"]
+# ignore_clickable_check = false
+# hotkeys = {
+# 	"Return" = "action left_click",
+# 	"Shift+L" = "__disabled__"
+# }
+
+## Linux example (key on WM_CLASS / app_id, confirmed via xprop / swaymsg):
+# [[hints.app_configs]]
+# bundle_id = "org.kde.konsole"
+# ignore_clickable_check = true
+
+[grid]
+enabled = false
+
+[recursive_grid]
+enabled = false

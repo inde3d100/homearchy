@@ -1,0 +1,50 @@
+name: Bug report
+description: Report reproducible Homearchy behavior
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: checkboxes
+    attributes:
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: Neru was stopped before reproducing this Homearchy issue.
+          required: true
+  - type: input
+    attributes:
+      label: Homearchy version
+      description: Run the bundled `homearchy --version` command.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Omarchy version
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Architecture
+      options: [arm64, amd64]
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Steps to reproduce
+      description: Include the mode, focused application, and exact keys or commands.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Diagnostics
+      description: Paste `homearchy status --json`, `homearchy doctor`, `omarchy-shell io.github.inde3d100.homearchy status`, and `hyprctl configerrors`. Remove secrets.
+      render: shell

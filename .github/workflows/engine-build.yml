@@ -1,0 +1,113 @@
+name: Engine bundle
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    name: Build linux/${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libcairo2-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxtst-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxfixes-dev \
+            libxkbcommon-dev \
+            wayland-protocols \
+            libei-dev \
+            liboeffis-dev \
+            libtesseract-dev \
+            tesseract-ocr-eng \
+            libpipewire-0.3-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 1.26.6
+          cache: true
+
+      - name: Build engine
+        env:
+          GIT_COMMIT: ${{ github.sha }}
+          VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('0.0.0-{0}', github.sha) }}
+        run: |
+          export BUILD_DATE
+          BUILD_DATE="$(git show -s --format=%cI "$GITHUB_SHA")"
+          scripts/build-linux-engine.sh "${{ matrix.arch }}"
+
+      - name: Smoke-test engine
+        run: |
+          output="$(bin/homearchy-linux-${{ matrix.arch }} --version)"
+          printf '%s\n' "$output"
+          [[ "$output" == Homearchy\ version* ]]
+
+      - name: Upload engine
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: engine-${{ matrix.arch }}
+          path: bin/homearchy-linux-${{ matrix.arch }}
+          if-no-files-found: error
+          compression-level: 0
+
+  bundle:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download engines
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: engine-*
+          path: dist
+          merge-multiple: true
+
+      - name: Assemble bundle
+        run: |
+          install -m 0755 bin/homearchy dist/homearchy
+          install -m 0755 bin/homearchy-setup dist/homearchy-setup
+          install -m 0644 LICENSE dist/LICENSE
+          chmod 0755 dist/homearchy-linux-amd64 dist/homearchy-linux-arm64
+          cd dist
+          sha256sum homearchy homearchy-setup homearchy-linux-amd64 homearchy-linux-arm64 > SHA256SUMS
+
+      - name: Attest engines
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: |
+            dist/homearchy-linux-amd64
+            dist/homearchy-linux-arm64
+
+      - name: Upload engine bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: homearchy-engine-bundle
+          path: dist/
+          if-no-files-found: error
+          compression-level: 0

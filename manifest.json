@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.inde3d100.homearchy",
+  "name": "Homearchy",
+  "version": "0.1.0",
+  "author": "inde3d100",
+  "license": "MIT",
+  "description": "Keyboard-driven navigation for Omarchy",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Homearchy",
+    "description": "Homearchy engine status and controls",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

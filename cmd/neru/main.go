@@ -1,0 +1,179 @@
+// Package main is the entry point for the Homearchy engine.
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"go.uber.org/zap"
+
+	"github.com/y3owk1n/neru/internal/adapter/platform"
+	"github.com/y3owk1n/neru/internal/app"
+	"github.com/y3owk1n/neru/internal/config"
+	"github.com/y3owk1n/neru/internal/config/loader"
+	"github.com/y3owk1n/neru/internal/ports"
+)
+
+type alertProvider struct {
+	system loader.AlertProvider
+}
+
+func newAlertProvider(sp ports.SystemPort) *alertProvider {
+	return &alertProvider{system: sp}
+}
+
+func (p *alertProvider) ShowAlert(ctx context.Context, title, message string) error {
+	if p.system != nil {
+		return p.system.ShowAlert(ctx, title, message)
+	}
+
+	return nil
+}
+
+// LaunchDaemon is called by the CLI to launch the daemon.
+func LaunchDaemon(configPath string) {
+	// Create system port early for startup notice and alerts.
+	systemPort, sysPortErr := platform.NewSystemPort()
+
+	// On non-macOS, print a brief startup notice directing to 'homearchy doctor'
+	// for the full platform capability report. Uses the system port's
+	// lightweight PlatformLabel() (no I/O or live probes) as the primary
+	// source, falling back to CurrentOS() when the port is unavailable.
+	if !platform.IsDarwin() {
+		if sysPortErr != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  %s\n\n", sysPortErr.Error())
+		} else {
+			printPlatformStartupNotice(systemPort.PlatformLabel())
+		}
+	}
+
+	service := loader.NewService(
+		config.DefaultConfig(),
+		configPath,
+		zap.NewNop(),
+		newAlertProvider(systemPort),
+	)
+	configResult := service.LoadWithValidation(configPath)
+
+	// If there's a validation error, show alert and exit
+	if configResult.ValidationError != nil {
+		handleConfigValidationError(configResult)
+	}
+
+	if configResult.ConfigPath == "" && configPath == "" {
+		configResult = handleConfigOnboarding(service, configResult)
+	}
+
+	handleAccessibilityPermissionStartup()
+
+	app, appErr := app.New(
+		app.WithConfig(configResult.Config),
+		app.WithWrittenConfig(configResult.Written),
+		app.WithConfigPath(configResult.ConfigPath),
+	)
+	if appErr != nil {
+		fmt.Fprintf(os.Stderr, "Error creating app: %v\n", appErr)
+		os.Exit(1)
+	}
+
+	err := newDaemonHost().Run(app)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error running app: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// printPlatformStartupNotice prints a compact startup notice on non-macOS.
+// Uses the system port's lightweight PlatformLabel() (no I/O, no live probes)
+// as the primary source, falling back to CurrentOS() when unavailable.
+func printPlatformStartupNotice(platformLabel string) {
+	if platformLabel == "" {
+		platformLabel = string(platform.CurrentOS())
+	}
+
+	fmt.Fprintf(
+		os.Stderr,
+		"⚠️  Homearchy is running on %s. Run 'homearchy doctor' for platform capabilities.\n\n",
+		platformLabel,
+	)
+}
+
+// handleConfigValidationError shows a validation error and exits.
+// Always displays a native alert (on supported platforms) in addition to printing to stderr.
+func handleConfigValidationError(result *config.LoadResult) {
+	errMsg := result.ValidationError.Error()
+	cfgPath := result.ConfigPath
+	fmt.Fprintf(os.Stderr, "⚠️  Configuration validation failed: %v\n", result.ValidationError)
+	fmt.Fprintf(os.Stderr, "Config file: %s\n", cfgPath)
+	fmt.Fprintf(os.Stderr, "Please fix the configuration and relaunch Homearchy.\n")
+
+	absPath, _ := filepath.Abs(cfgPath)
+	_ = platform.ShowConfigValidationErrorAlert(errMsg, absPath)
+
+	os.Exit(1)
+}
+
+func handleConfigOnboarding(
+	service *loader.Service,
+	configResult *config.LoadResult,
+) *config.LoadResult {
+	defaultPath, err := config.DefaultConfigPath()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to determine default config path: %v\n", err)
+
+		return configResult
+	}
+
+	if !promptConfigInit(defaultPath) {
+		return configResult
+	}
+
+	err = config.WriteDefaultConfig(defaultPath, false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create config file: %v\n", err)
+
+		return configResult
+	}
+
+	return service.LoadWithValidation(defaultPath)
+}
+
+func promptConfigInit(configPath string) bool {
+	absPath, _ := filepath.Abs(configPath)
+
+	choice := platform.ShowConfigOnboardingAlert(absPath)
+	switch choice {
+	case platform.ConfigOnboardingCreate:
+		return true
+	case platform.ConfigOnboardingQuit:
+		os.Exit(0)
+	case platform.ConfigOnboardingDefaults:
+		return false
+	default:
+		fmt.Fprintf(
+			os.Stderr,
+			"Unexpected onboarding alert response (%d), continuing with defaults\n",
+			choice,
+		)
+
+		return false
+	}
+
+	return false
+}
+
+func handleAccessibilityPermissionStartup() {
+	if !platform.IsDarwin() {
+		return
+	}
+
+	if platform.CheckAccessibilityPermissions() {
+		return
+	}
+
+	if platform.ShowAccessibilityPermissionStartupAlert() == platform.AccessibilityPermissionStartupQuit {
+		os.Exit(0)
+	}
+}

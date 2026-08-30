@@ -1,0 +1,18 @@
+//go:build darwin
+
+package darwin
+
+/*
+#include "secureinput.h"
+*/
+import "C"
+
+// IsSecureInputEnabled returns true if macOS secure input mode is currently active.
+func IsSecureInputEnabled() bool {
+	return C.NeruIsSecureInputEnabled() != 0
+}
+
+// ShowSecureInputNotification displays a notification about active secure input.
+func ShowSecureInputNotification() {
+	C.NeruShowSecureInputNotification()
+}

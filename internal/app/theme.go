@@ -1,0 +1,50 @@
+package app
+
+import (
+	"go.uber.org/zap"
+
+	"github.com/y3owk1n/neru/internal/ports"
+)
+
+// bridgeThemeProvider implements config.ThemeProvider using a SystemPort.
+type bridgeThemeProvider struct {
+	systemPort ports.SystemPort
+}
+
+// IsDarkMode returns true if the platform's dark mode is currently active.
+func (b *bridgeThemeProvider) IsDarkMode() bool {
+	if b.systemPort == nil {
+		return false
+	}
+
+	return b.systemPort.IsDarkMode()
+}
+
+// newThemeProvider creates a new theme provider using the provided system port.
+func newThemeProvider(systemPort ports.SystemPort) *bridgeThemeProvider {
+	return &bridgeThemeProvider{systemPort: systemPort}
+}
+
+// HandleThemeChange is the app's entry point for a system appearance change:
+// the platform theme observers call it, and the simulation harness drives it
+// the same way.
+//
+// It is one notification, not a fan-out: the overlay re-resolves every Style
+// from the configuration it already holds and invalidates the render
+// components' native caches, so the only thing left to do here is redraw
+// whichever mode is currently on screen. Which mode that is, and what redrawing
+// it means, belongs to the package that owns modes: this notifies, it does not
+// choose. A mode with nothing themed on screen answers by not carrying the axis
+// at all.
+func (a *App) HandleThemeChange(isDark bool) {
+	a.logger.Info("System theme changed",
+		zap.Bool("is_dark", isDark))
+
+	if a.overlayPort != nil {
+		a.overlayPort.RefreshStyles()
+	}
+
+	if a.modes != nil {
+		a.modes.RefreshActiveModeForThemeChange()
+	}
+}

@@ -1,0 +1,69 @@
+package cli
+
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/y3owk1n/neru/internal/buildinfo"
+	"github.com/y3owk1n/neru/internal/config"
+)
+
+// configInitCmd is the CLI config init command for creating a default configuration file.
+var configInitCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Create a default configuration file",
+	Long: `Create a default configuration file.
+The config is written to the default config directory for your platform
+(%APPDATA%/homearchy on Windows, $XDG_CONFIG_HOME/homearchy or ~/.config/homearchy on Unix).
+Use the global --config flag to write to a custom path instead.
+This copies the fully-commented default configuration to get you started.
+If a config file already exists, use --force to overwrite it.
+After running this command, start Homearchy with 'homearchy launch' and try:
+  Primary+Shift+C      Recursive Grid mode (recommended)
+  Primary+Shift+Space   Hints mode
+  Primary+Shift+S       Scroll mode
+  Escape            Exit any mode`,
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		force, _ := cmd.Flags().GetBool("force")
+
+		return runConfigInit(cmd, force)
+	},
+}
+
+func init() {
+	configInitCmd.Flags().BoolP("force", "f", false, "Overwrite existing config file")
+	configCmd.AddCommand(configInitCmd)
+}
+
+func runConfigInit(cmd *cobra.Command, force bool) error {
+	var cfgPath string
+
+	if configPath != "" {
+		cfgPath = configPath
+	} else {
+		path, err := config.DefaultConfigPath()
+		if err != nil {
+			return err
+		}
+
+		cfgPath = path
+	}
+
+	err := config.WriteDefaultConfig(cfgPath, force)
+	if err != nil {
+		return err
+	}
+
+	cmd.Println("Created config at " + cfgPath)
+	cmd.Println("")
+	cmd.Println("Quick start:")
+	cmd.Println("  1. Start Homearchy:          homearchy launch")
+	cmd.Println("  2. Try Recursive Grid:  Primary+Shift+C")
+	cmd.Println("  3. Try Hints mode:      Primary+Shift+Space")
+	cmd.Println("  4. Try Scroll mode:     Primary+Shift+S")
+	cmd.Println("  5. Exit any mode:       Escape")
+	cmd.Println("")
+	cmd.Println("Edit the config file to customize hotkeys, colors, and behavior.")
+	cmd.Println("Full reference: " + buildinfo.DocsURL("docs/CONFIGURATION.md", buildinfo.Version))
+
+	return nil
+}

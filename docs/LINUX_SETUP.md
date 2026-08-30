@@ -1,0 +1,465 @@
+# Linux Setup & Testing Guide
+
+Prepare a Linux host to **build, test, and deploy** Neru. This guide covers
+dependencies, permissions, building, validation, and generic troubleshooting.
+
+Per-desktop-environment implementation details and DE-specific known issues live
+in [LINUX_DESKTOPS.md](./LINUX_DESKTOPS.md).
+
+**Related:** [Linux desktops](./LINUX_DESKTOPS.md) ·
+[Cross-Platform Guide](./CROSS_PLATFORM.md) · [Installation](./INSTALLATION.md)
+
+---
+
+## Table of Contents
+
+- [Supported backends](#supported-backends)
+- [Install-time environment adjustments](#install-time-environment-adjustments)
+- [Wayland keyboard capture permissions](#wayland-keyboard-capture-permissions)
+- [Using nix home manager](#using-nix-home-manager)
+- [Build dependencies](#build-dependencies)
+- [Building](#building)
+- [Validation & deployment](#validation--deployment)
+- [Known limitations](#known-limitations)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Supported backends
+
+| Compositor / session        | Backend         | Status                                                                           |
+| --------------------------- | --------------- | -------------------------------------------------------------------------------- |
+| Sway, Hyprland, niri, River | wayland-wlroots | Supported                                                                        |
+| KDE Plasma (Wayland)        | wayland-kde     | Supported — see [LINUX_DESKTOPS.md](./LINUX_DESKTOPS.md#kde-plasma-wayland)      |
+| X11 / XOrg, i3              | x11             | Supported                                                                        |
+| GNOME (Wayland)             | wayland-gnome   | Not supported — see [LINUX_DESKTOPS.md](./LINUX_DESKTOPS.md#gnome-not-supported) |
+
+---
+
+## Install-time environment adjustments
+
+Host changes required before Neru runs correctly (not code changes):
+
+| #   | Adjustment                                                  | Why                                   | Backends  | Persists?               |
+| --- | ----------------------------------------------------------- | ------------------------------------- | --------- | ----------------------- |
+| 1   | Install [build dependencies](#build-dependencies)           | CGO backends and runtime libs         | All Linux | Yes                     |
+| 2   | Add user to `input` group: `sudo usermod -aG input "$USER"` | `evdev` keyboard capture **and Neru's own global hotkeys** on Wayland | Wayland | Yes (re-login required) |
+| 3   | Bind `neru <mode>` in compositor keybindings                | Only needed if you skip item 2        | Wayland   | Yes (user config)       |
+
+Notes:
+
+- X11 only needs item 1; global hotkeys work via `XGrabKey` from Neru config.
+- Item 2 takes effect after a full logout/login or reboot.
+- Item 3 is a **fallback, not a requirement**: with item 2 in place Neru's own
+  `[hotkeys]` config works on Wayland through a passive evdev listener. Bind in
+  the compositor only if you would rather not grant `/dev/input` access. See
+  [Global hotkeys on Wayland](./LINUX_DESKTOPS.md#global-hotkeys-on-wayland).
+- Item 3 cannot be automated by a package; ship example snippets where helpful.
+
+---
+
+## Wayland keyboard capture permissions
+
+On Wayland, Neru uses direct `evdev` keyboard capture during active modes so
+modified clicks and sticky modifiers work reliably.
+
+```bash
+sudo usermod -aG input "$USER"
+```
+
+Log out and back in, then confirm `id` lists the `input` group.
+
+> Membership in `input` allows reading system-wide keyboard events. Use a tighter
+> distro-specific `udev`/ACL setup if the group is too broad for your environment.
+
+When capture works, Neru logs `Using Wayland evdev keyboard capture`. Without
+device access it falls back to overlay-focused capture; basic navigation still
+works but modified clicks may degrade.
+
+---
+
+## Using nix home manager
+
+Minimal flake with Home Manager:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    neru.url = "github:y3owk1n/neru";
+  };
+
+  outputs =
+    {
+      nixpkgs,
+      home-manager,
+      neru,
+      ...
+    }:
+    {
+      homeConfigurations."my-host" = home-manager.lib.homeManagerConfiguration {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux; # or aarch64-linux
+
+        modules = [
+          (
+            { pkgs, ... }:
+            {
+              nixpkgs.overlays = [ neru.overlays.default ];
+              home.username = "youruser";
+              home.homeDirectory = "/home/youruser";
+              home.stateVersion = "24.05";
+
+              home.packages = [
+                pkgs.neru
+              ];
+
+              programs.home-manager.enable = true;
+            }
+          )
+        ];
+      };
+    };
+}
+```
+
+---
+
+## Build dependencies
+
+Neru links `libei` and `liboeffis` at build time (KDE and future libei-based
+Wayland paths). Install the `-dev`/`-devel` packages below even if you only test
+on wlroots compositors today.
+
+Three of them are for reading what is on screen, and all three are required
+rather than optional. **tesseract** is what recognizes on-screen text when an
+application's AT-SPI tree is too thin to hint from, and Neru links it
+dynamically — a missing `libtesseract.so` stops the daemon before any Neru code
+runs, whatever `hints.strategy` is set to. Its **English language data** is a
+separate package on every distribution, and unlike the library it is resolved at
+use: without it Neru starts normally and `hints.strategy = vision` reports that
+`eng.traineddata` is missing rather than silently finding nothing. If you keep
+your language data somewhere else — a `tessdata_fast` checkout, say — point
+`TESSDATA_PREFIX` at it and Neru will prefer that.
+
+**pipewire** is how a KDE Plasma session hands over the pixels tesseract then
+reads. KWin implements no screencopy protocol, so capture there goes through
+`xdg-desktop-portal`'s ScreenCast session and its frames arrive over PipeWire.
+It is linked the same way and carries the same consequence — a missing
+`libpipewire-0.3.so` stops the daemon on every desktop, not only on KDE. On KDE
+you also approve screen sharing once, the first time a vision-strategy hint
+activation needs it; the grant is remembered across restarts.
+
+### Debian / Ubuntu
+
+```bash
+sudo apt-get install -y \
+  libcairo2-dev \
+  libwayland-dev \
+  libx11-dev \
+  libxtst-dev \
+  libxrandr-dev \
+  libxinerama-dev \
+  libxfixes-dev \
+  libxkbcommon-dev \
+  libei-dev \
+  liboeffis-dev \
+  libfontconfig-dev \
+  libtesseract-dev \
+  tesseract-ocr-eng \
+  libpipewire-0.3-dev \
+  wayland-protocols \
+  fonts-dejavu-core
+```
+
+### Fedora
+
+```bash
+sudo dnf install -y \
+  cairo-devel \
+  wayland-devel \
+  libX11-devel \
+  libXtst-devel \
+  libXrandr-devel \
+  libXinerama-devel \
+  libXfixes-devel \
+  libxkbcommon-devel \
+  libei-devel \
+  liboeffis-devel \
+  fontconfig-devel \
+  tesseract-devel \
+  tesseract-langpack-eng \
+  pipewire-devel \
+  wayland-protocols-devel \
+  dejavu-sans-fonts dejavu-serif-fonts dejavu-sans-mono-fonts
+```
+
+### Arch Linux
+
+```bash
+sudo pacman -S \
+  cairo \
+  wayland \
+  libx11 \
+  libxtst \
+  libxrandr \
+  libxinerama \
+  libxfixes \
+  libxkbcommon \
+  libei \
+  fontconfig \
+  tesseract \
+  tesseract-data-eng \
+  libpipewire \
+  wayland-protocols \
+  ttf-dejavu
+```
+
+On Arch, `liboeffis` (required by the KDE/libei path) is bundled in the `libei`
+package, so no separate package is needed.
+
+`fontconfig` is required at build time. DejaVu fonts are recommended defaults
+when `font_family` is unset (sticky modifier symbols `❖⇧⌥⌃`).
+
+---
+
+## Building
+
+```bash
+# Native build on the host (recommended for local dev and testing)
+just build
+
+# Cross-build for a named Linux GOARCH (recipe defaults to amd64)
+just build-linux          # amd64
+just build-linux arm64    # arm64
+
+# Cross-compilation from macOS to Linux is NOT supported (CGO + Linux headers)
+```
+
+Verify the binary matches your target:
+
+```bash
+go env GOARCH
+file bin/neru
+```
+
+Run the [pre-commit checks](../CONTRIBUTING.md#making-changes) before opening a
+PR. One Linux-specific note: CI lints with `golangci-lint v2.12.2`, so match
+that version when validating locally.
+
+---
+
+## Validation & deployment
+
+### Hotkey configuration
+
+**X11:** Hotkeys in `config.toml` work via `XGrabKey`.
+
+**Wayland:** Hotkeys in `config.toml` also work, through a passive `evdev`
+listener, provided the daemon can read `/dev/input` (see item 2 above). If you
+would rather not grant that access, bind `neru <mode>` in the compositor
+instead — see [Global hotkeys on Wayland](./LINUX_DESKTOPS.md#global-hotkeys-on-wayland).
+Compositor examples:
+
+Sway (`~/.config/sway/config`):
+
+```sway
+bindsym $mod+Shift+h exec neru hints
+bindsym $mod+Shift+g exec neru grid
+bindsym $mod+Shift+s exec neru scroll
+```
+
+Hyprland (`~/.config/hypr/hyprland.conf`):
+
+```hyprlang
+bind = $mod SHIFT, H, exec, neru hints
+bind = $mod SHIFT, G, exec, neru grid
+bind = $mod SHIFT, S, exec, neru scroll
+```
+
+niri (`~/.config/niri/config.kdl`):
+
+```kdl
+binds {
+    Mod+Shift+H { spawn-sh "neru hints"; }
+    Mod+Shift+G { spawn-sh "neru grid"; }
+    Mod+Shift+S { spawn-sh "neru scroll"; }
+    Mod+Shift+R { spawn-sh "neru recursive_grid"; }
+}
+```
+
+KDE Plasma and other desktops: see [LINUX_DESKTOPS.md](./LINUX_DESKTOPS.md).
+
+### Application exclusions
+
+Linux uses X11 `WM_CLASS` or Wayland process name from `/proc/<pid>/cmdline`:
+
+```toml
+[general]
+excluded_apps = ["firefox", "chromium-browser", "code"]
+```
+
+### systemd user service
+
+`neru services` manages the daemon for you. One command installs a systemd user
+unit, enables it for every login, and starts it now:
+
+```bash
+neru services install
+```
+
+The other subcommands drive the same unit:
+
+```bash
+neru services status      # installed? running? enabled at login?
+neru services stop        # stop now, still starts on next login
+neru services start
+neru services restart
+neru services uninstall   # disable and remove the unit
+```
+
+**What it writes.** `neru.service`, under `$XDG_CONFIG_HOME/systemd/user` —
+`~/.config/systemd/user` unless you set that variable to an absolute path, which
+is the same base directory Neru resolves `config.toml` from. `ExecStart` is the
+resolved path of the `neru` binary you ran `install` with, so run
+`neru services uninstall && neru services install` after moving the binary.
+Why it is anchored on `graphical-session.target`, and why other init systems are
+out of scope: ["Service management on Linux"](./CROSS_PLATFORM.md#capability-matrix).
+
+**Your session has to export itself first.** A systemd *user* manager starts
+before your compositor and inherits nothing from it, so unless the session
+imports its own variables, `neru launch` runs with no `WAYLAND_DISPLAY`,
+`DISPLAY`, `XDG_CURRENT_DESKTOP` or compositor socket, and Neru cannot find a
+display server to drive. Most desktop environments (GNOME, KDE Plasma) and
+session wrappers (`uwsm`) do this for you. A bare compositor started from a TTY
+does not — add it to your compositor config, before anything that depends on it:
+
+```
+# sway (~/.config/sway/config)
+exec systemctl --user import-environment \
+  WAYLAND_DISPLAY DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP XDG_SESSION_TYPE
+exec dbus-update-activation-environment --systemd \
+  WAYLAND_DISPLAY DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP XDG_SESSION_TYPE
+exec systemctl --user start graphical-session.target
+```
+
+Hyprland, niri and River take the same three lines with their own socket
+variable (`HYPRLAND_INSTANCE_SIGNATURE`, `NIRI_SOCKET`) in place of `SWAYSOCK`.
+
+**If it does not start.** `graphical-session.target` is reached only if
+something in your session activates it — the third `exec` above is what does it
+for a bare compositor. Check both:
+
+```bash
+systemctl --user status neru.service
+systemctl --user is-active graphical-session.target
+```
+
+If the target is inactive and you would rather not wire the session up, run
+`neru launch` from your compositor's autostart instead.
+
+**Other init systems.** Service management covers systemd only. On a machine
+booted by runit, OpenRC or s6, every `neru services` subcommand reports
+`ERR_NOT_SUPPORTED`; run `neru launch` from your session's own supervisor or
+autostart. This is a stated boundary rather than a missing feature — see
+[ADR 0013](./adr/0013-parity-is-measured-in-words-not-subsystems.md).
+
+**Installed through a package manager, or wrote the unit yourself?** If Nix,
+home-manager or your distribution already ships a `neru.service` — or you wrote
+one by hand from an older version of this guide — manage it there. `neru
+services` stays out of the way in both directions: `install` refuses rather than
+overwriting a unit it did not write, and `uninstall` refuses rather than
+disabling or deleting one. Ownership is read out of the file rather than assumed
+from its path: every unit Neru installs opens with
+``# Installed by `neru services install` ``, and a `neru.service` without that
+line is one Neru will not touch, wherever it sits. Remove yours the way you
+created it (`systemctl --user disable --now neru.service` and delete the file),
+then `neru services install` writes Neru's own in its place.
+
+**Relocated `$XDG_CONFIG_HOME`?** Set it in your session, not only in a shell
+rc: the user manager fixed its unit search path at login, so a directory it
+never heard of is one it will never read. `neru services install` checks the
+manager's own search path and says so rather than writing a unit that would sit
+there unloaded.
+
+---
+
+## Known limitations
+
+1. **Wayland global hotkeys** — Neru's own `[hotkeys]` config works via a passive
+   evdev listener, which needs `input`-group access and a CGO build; otherwise
+   bind the modes in your compositor instead. See
+   [Global hotkeys on Wayland](./LINUX_DESKTOPS.md#global-hotkeys-on-wayland).
+2. **Hints need AT-SPI** — Grid and scroll work without it; hints coverage varies
+   by app. DE-specific coordinate details: [LINUX_DESKTOPS.md](./LINUX_DESKTOPS.md).
+3. **Dark mode** — Via `org.freedesktop.appearance` portal, with session-specific
+   fallbacks where the portal is unavailable.
+4. **Notifications** — Delivered over `org.freedesktop.Notifications` on the
+   session bus, so a notification daemon (mako, dunst, or your desktop's own)
+   has to be running — or installed as a D-Bus service the bus starts on
+   demand, as most desktops ship theirs. What Neru does when neither, and why
+   an alert is not modal here: "Native alerts on Linux" under the
+   [Capability Matrix](./CROSS_PLATFORM.md#capability-matrix).
+5. **Wayland modified clicks** — Need `evdev` access (see [keyboard permissions](#wayland-keyboard-capture-permissions)).
+6. **Monitor hotplug** — Adding/removing a monitor is tracked live (RandR on X11,
+   `wl_output` on Wayland) and the overlay follows; a relaunch is only needed for a
+   resolution/scale change to an existing monitor on Wayland.
+7. **DE-specific limits** (portal consent, protocol gaps): [LINUX_DESKTOPS.md](./LINUX_DESKTOPS.md).
+
+---
+
+## Troubleshooting
+
+### "WAYLAND_DISPLAY is not set"
+
+Running under X11 or a TTY. Neru uses the X11 backend when `DISPLAY` is set.
+
+### "compositor does not support zwlr_virtual_pointer_v1"
+
+Expected on KDE, where input routes through libei instead. On any other
+compositor it means there is no usable input path — see
+[Checking compositor protocols](./LINUX_DESKTOPS.md#checking-compositor-protocols).
+
+### Overlay or hints wrong size after display change
+
+Monitor hotplug (add/remove) is tracked live. If the overlay is still wrong after
+a resolution or scale change to an existing monitor, relaunch: `neru stop` then
+`neru launch`.
+
+### "failed to connect to Wayland compositor"
+
+```bash
+echo $WAYLAND_DISPLAY
+wl-info   # wayland-utils package
+```
+
+### "Wayland evdev capture unavailable; falling back to overlay keyboard focus"
+
+Add the user to `input`, re-login, confirm with `id`. See
+[keyboard permissions](#wayland-keyboard-capture-permissions).
+
+### Sticky modifier indicator shows `[][][][]`
+
+Set a font with modifier glyphs:
+
+```toml
+[sticky_modifiers.ui]
+font_family = "Your installed symbol-capable font"
+```
+
+Check the family is installed — a family fontconfig does not have falls back to
+the DejaVu generic rather than to fontconfig's substitute for it
+([font resolution](CROSS_PLATFORM.md#capability-matrix)), so the name has to be
+one `fc-list` reports:
+
+```bash
+fc-list : family | grep -i "your font"
+```
+
+Paste `❖⇧⌥⌃` into a text editor to confirm the font renders before relying on it
+in Neru.
+
+DE-specific troubleshooting: [LINUX_DESKTOPS.md](./LINUX_DESKTOPS.md).

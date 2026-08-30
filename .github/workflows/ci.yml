@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            just \
+            libcairo2-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxtst-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxfixes-dev \
+            libxkbcommon-dev \
+            wayland-protocols \
+            libei-dev \
+            liboeffis-dev \
+            libtesseract-dev \
+            tesseract-ocr-eng \
+            libpipewire-0.3-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 1.26.6
+          cache: true
+
+      - name: Test
+        env:
+          CGO_CFLAGS_ALLOW: -fno-strict-overflow
+        run: |
+          just test-foundation
+          go test ./...
+
+  plugin:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Verify plugin package
+        run: |
+          jq -e '
+            .schemaVersion == 1
+            and .id == "io.github.inde3d100.homearchy"
+            and (.kinds | index("service"))
+            and (.kinds | index("bar-widget"))
+            and .entryPoints.service == "Service.qml"
+            and .entryPoints.barWidget == "BarWidget.qml"
+          ' manifest.json
+          test -x bin/homearchy
+          test -x bin/homearchy-setup
+          test -x bin/homearchy-linux-amd64
+          test -x bin/homearchy-linux-arm64
+          python3 -m py_compile bin/homearchy-setup
+          (cd bin && sha256sum -c SHA256SUMS)

@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Install or remove Homearchy's managed Omarchy keybindings."""
+
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+PLUGIN_ID = "io.github.inde3d100.homearchy"
+START_MARKER = f"-- Homearchy bindings: managed by {PLUGIN_ID}"
+END_MARKER = "-- End Homearchy bindings"
+BINDINGS = (
+    ("SUPER + SHIFT + H", "Homearchy hints", "hints --action left_click"),
+    ("SUPER + SHIFT + U", "Homearchy search", "hints --search --action left_click"),
+    ("SUPER + SHIFT + J", "Homearchy grid", "grid --action left_click"),
+    ("SUPER + D", "Homearchy recursive grid", "recursive_grid --action left_click"),
+    ("SUPER + Z", "Homearchy scroll", "scroll"),
+    ("SUPER + SHIFT + I", "Homearchy monitor selection", "monitor_select"),
+    ("SUPER + SHIFT + ESCAPE", "Homearchy cancel overlay", "idle"),
+)
+LEGACY_NERU = re.compile(
+    r'^\s*o\.bind\("SUPER \+ (?:D|Z)",\s*"Neru (?:recursive grid|scroll)",\s*"[^"]*/neru (?:recursive_grid|scroll)"\)\s*$'
+)
+BIND = re.compile(r'^\s*o\.bind\("([^"]+)"\s*,')
+
+
+def normalize(binding: str) -> str:
+    return " + ".join(part.strip().upper() for part in binding.split("+"))
+
+
+def strip_managed_block(lines: list[str]) -> list[str]:
+    result: list[str] = []
+    inside = False
+    found_end = False
+    for line in lines:
+        if line.rstrip("\n") == START_MARKER:
+            if inside:
+                raise ValueError("nested Homearchy binding markers")
+            inside = True
+            continue
+        if line.rstrip("\n") == END_MARKER:
+            if not inside:
+                raise ValueError("Homearchy end marker without start marker")
+            inside = False
+            found_end = True
+            continue
+        if not inside:
+            result.append(line)
+    if inside:
+        raise ValueError("Homearchy binding block has no end marker")
+    if found_end:
+        while result and not result[-1].strip():
+            result.pop()
+        if result:
+            result.append("\n")
+    return result
+
+
+def managed_block(engine: Path) -> list[str]:
+    command = str(engine).replace("\\", "\\\\").replace('"', '\\"')
+    lines = [START_MARKER + "\n"]
+    for binding, label, action in BINDINGS:
+        lines.append(f'o.bind("{binding}", "{label}", "{command} {action}")\n')
+    lines.append(END_MARKER + "\n")
+    return lines
+
+
+def write_atomic(path: Path, content: str) -> None:
+    mode = path.stat().st_mode
+    with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False) as temporary:
+        temporary.write(content)
+        temporary.flush()
+        os.fsync(temporary.fileno())
+        temporary_path = Path(temporary.name)
+    temporary_path.chmod(mode)
+    os.replace(temporary_path, path)
+
+
+def reload_hyprland() -> str:
+    subprocess.run(["hyprctl", "reload"], check=True, stdout=subprocess.DEVNULL)
+    result = subprocess.run(
+        ["hyprctl", "configerrors"], check=True, capture_output=True, text=True
+    )
+    return result.stdout.strip()
+
+
+def update_bindings(path: Path, remove: bool) -> int:
+    if not path.is_file():
+        print(f"Homearchy: bindings file not found: {path}", file=sys.stderr)
+        return 1
+
+    original = path.read_text()
+    try:
+        lines = strip_managed_block(original.splitlines(keepends=True))
+    except ValueError as error:
+        print(f"Homearchy: {error}", file=sys.stderr)
+        return 1
+
+    if not remove:
+        lines = [line for line in lines if not LEGACY_NERU.match(line.rstrip("\n"))]
+        wanted = {normalize(binding) for binding, _, _ in BINDINGS}
+        conflicts = []
+        for line_number, line in enumerate(lines, 1):
+            match = BIND.match(line)
+            if match and normalize(match.group(1)) in wanted:
+                conflicts.append(f"{path}:{line_number}: {line.rstrip()}")
+        if conflicts:
+            print("Homearchy: refusing to replace non-Neru bindings:", file=sys.stderr)
+            print("\n".join(conflicts), file=sys.stderr)
+            return 2
+
+        while lines and not lines[-1].strip():
+            lines.pop()
+        if lines:
+            lines.append("\n")
+        engine = Path(__file__).resolve().with_name("homearchy")
+        lines.extend(managed_block(engine))
+
+    updated = "".join(lines)
+    if updated == original:
+        print("Homearchy bindings already " + ("removed" if remove else "installed"))
+        return 0
+
+    backup = path.with_name(path.name + ".pre-homearchy")
+    if not backup.exists():
+        shutil.copy2(path, backup)
+
+    write_atomic(path, updated)
+    try:
+        errors = reload_hyprland()
+    except (OSError, subprocess.CalledProcessError) as error:
+        write_atomic(path, original)
+        try:
+            reload_hyprland()
+        except (OSError, subprocess.CalledProcessError):
+            pass
+        print(f"Homearchy: Hyprland reload failed; restored original bindings: {error}", file=sys.stderr)
+        return 1
+
+    if errors:
+        write_atomic(path, original)
+        reload_hyprland()
+        print("Homearchy: Hyprland rejected the bindings; restored original file:", file=sys.stderr)
+        print(errors, file=sys.stderr)
+        return 1
+
+    print("Homearchy bindings " + ("removed" if remove else "installed"))
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--remove", action="store_true", help="remove the managed bindings")
+    arguments = parser.parse_args()
+    bindings_file = Path.home() / ".config" / "hypr" / "bindings.lua"
+    return update_bindings(bindings_file, arguments.remove)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
