@@ -18,8 +18,12 @@ BarWidget {
     : "Homearchy · " + engineState
 
   property bool popupOpen: false
+  property bool showingHotkeyHelp: false
 
-  function close() { popupOpen = false }
+  function close() {
+    popupOpen = false
+    showingHotkeyHelp = false
+  }
   function runMode(arguments) {
     if (homearchyService) homearchyService.runMode(arguments)
   }
@@ -57,102 +61,176 @@ BarWidget {
       anchors.fill: parent
       spacing: Style.space(10)
 
-      Text {
-        text: "Homearchy"
-        color: root.bar.foreground
-        font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.subtitle
-        font.bold: true
-      }
-
-      Text {
+      Column {
         width: parent.width
-        text: root.statusText
-        color: root.engineReady ? root.bar.foreground : Color.urgent
-        font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        elide: Text.ElideRight
+        spacing: Style.space(10)
+        visible: !root.showingHotkeyHelp
+
+        Text {
+          text: "Homearchy"
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.subtitle
+          font.bold: true
+        }
+
+        Text {
+          width: parent.width
+          text: root.statusText
+          color: root.engineReady ? root.bar.foreground : Color.urgent
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          elide: Text.ElideRight
+        }
+
+        PanelSeparator {
+          width: parent.width
+          foreground: root.bar.foreground
+        }
+
+        Grid {
+          columns: 2
+          spacing: Style.space(6)
+
+          Button {
+            width: Style.space(148)
+            text: "Hints"
+            iconText: "󰍽"
+            foreground: root.bar.foreground
+            enabled: root.engineReady
+            leftAlign: true
+            onClicked: { root.runMode(["hints"]); root.close() }
+          }
+          Button {
+            width: Style.space(148)
+            text: "Search"
+            iconText: "󰍉"
+            foreground: root.bar.foreground
+            enabled: root.engineReady
+            leftAlign: true
+            onClicked: { root.runMode(["hints", "--search"]); root.close() }
+          }
+          Button {
+            width: Style.space(148)
+            text: "Grid"
+            iconText: "󰕰"
+            foreground: root.bar.foreground
+            enabled: root.engineReady
+            leftAlign: true
+            onClicked: { root.runMode(["grid"]); root.close() }
+          }
+          Button {
+            width: Style.space(148)
+            text: "Recursive grid"
+            iconText: "󰘕"
+            foreground: root.bar.foreground
+            enabled: root.engineReady
+            leftAlign: true
+            onClicked: { root.runMode(["recursive_grid"]); root.close() }
+          }
+          Button {
+            width: Style.space(148)
+            text: "Scroll"
+            iconText: "󰹹"
+            foreground: root.bar.foreground
+            enabled: root.engineReady
+            leftAlign: true
+            onClicked: { root.runMode(["scroll"]); root.close() }
+          }
+          Button {
+            width: Style.space(148)
+            text: "Monitor"
+            iconText: "󰍹"
+            foreground: root.bar.foreground
+            enabled: root.engineReady
+            leftAlign: true
+            onClicked: { root.runMode(["monitor_select"]); root.close() }
+          }
+        }
+
+        PanelSeparator {
+          width: parent.width
+          foreground: root.bar.foreground
+        }
+
+        Button {
+          width: parent.width
+          text: "Configure hotkeys"
+          iconText: "󰌌"
+          foreground: root.bar.foreground
+          leftAlign: true
+          onClicked: root.showingHotkeyHelp = true
+        }
+
+        Button {
+          width: parent.width
+          text: "Restart engine"
+          iconText: "󰑐"
+          foreground: root.bar.foreground
+          leftAlign: true
+          onClicked: {
+            if (root.homearchyService) root.homearchyService.requestRestart()
+            root.close()
+          }
+        }
       }
 
-      PanelSeparator {
+      Column {
         width: parent.width
-        foreground: root.bar.foreground
-      }
+        spacing: Style.space(10)
+        visible: root.showingHotkeyHelp
 
-      Grid {
-        columns: 2
-        spacing: Style.space(6)
+        Text {
+          text: "Configure hotkeys"
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.subtitle
+          font.bold: true
+        }
+
+        Text {
+          width: parent.width
+          wrapMode: Text.WordWrap
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          text: "Hyprland chords live in the managed Homearchy block in ~/.config/hypr/bindings.lua. Reload with hyprctl reload after you edit them."
+        }
+
+        Text {
+          width: parent.width
+          wrapMode: Text.WordWrap
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          text: "Keep the [hotkeys] table in Service.qml generatedConfig() on the same chords, then restart the plugin:"
+        }
+
+        Text {
+          width: parent.width
+          wrapMode: Text.WrapAnywhere
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          text: "omarchy-shell io.github.inde3d100.homearchy restart"
+        }
+
+        Text {
+          width: parent.width
+          wrapMode: Text.WordWrap
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          text: "Re-running homearchy-setup restores the defaults. Overlay Space, Enter, and Escape are generated by the plugin, not by bindings.lua."
+        }
 
         Button {
-          width: Style.space(148)
-          text: "Hints"
-          iconText: "󰍽"
+          width: parent.width
+          text: "Back"
+          iconText: "󰁍"
           foreground: root.bar.foreground
-          enabled: root.engineReady
           leftAlign: true
-          onClicked: { root.runMode(["hints"]); root.close() }
-        }
-        Button {
-          width: Style.space(148)
-          text: "Search"
-          iconText: "󰍉"
-          foreground: root.bar.foreground
-          enabled: root.engineReady
-          leftAlign: true
-          onClicked: { root.runMode(["hints", "--search"]); root.close() }
-        }
-        Button {
-          width: Style.space(148)
-          text: "Grid"
-          iconText: "󰕰"
-          foreground: root.bar.foreground
-          enabled: root.engineReady
-          leftAlign: true
-          onClicked: { root.runMode(["grid"]); root.close() }
-        }
-        Button {
-          width: Style.space(148)
-          text: "Recursive grid"
-          iconText: "󰘕"
-          foreground: root.bar.foreground
-          enabled: root.engineReady
-          leftAlign: true
-          onClicked: { root.runMode(["recursive_grid"]); root.close() }
-        }
-        Button {
-          width: Style.space(148)
-          text: "Scroll"
-          iconText: "󰹹"
-          foreground: root.bar.foreground
-          enabled: root.engineReady
-          leftAlign: true
-          onClicked: { root.runMode(["scroll"]); root.close() }
-        }
-        Button {
-          width: Style.space(148)
-          text: "Monitor"
-          iconText: "󰍹"
-          foreground: root.bar.foreground
-          enabled: root.engineReady
-          leftAlign: true
-          onClicked: { root.runMode(["monitor_select"]); root.close() }
-        }
-      }
-
-      PanelSeparator {
-        width: parent.width
-        foreground: root.bar.foreground
-      }
-
-      Button {
-        width: parent.width
-        text: "Restart engine"
-        iconText: "󰑐"
-        foreground: root.bar.foreground
-        leftAlign: true
-        onClicked: {
-          if (root.homearchyService) root.homearchyService.requestRestart()
-          root.close()
+          onClicked: root.showingHotkeyHelp = false
         }
       }
     }
