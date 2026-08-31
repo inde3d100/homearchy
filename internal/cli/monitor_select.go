@@ -5,10 +5,12 @@ import "github.com/y3owk1n/neru/internal/domain"
 // MonitorSelectCmd is the CLI command for interactive monitor picking.
 var MonitorSelectCmd = BuildModeCommand(ModeConfig{
 	Mode:  domain.ModeMonitorSelect,
-	Short: "Launch monitor selection mode",
+	Short: "Launch monitor selection mode (alpha)",
 	Long: `Activate monitor_select mode for interactive display picking.
 
-If only one monitor is available, the command is a no-op.
+This mode is alpha on Homearchy: it has not been exercised on a
+multi-monitor Hyprland session. If only one monitor is available, the
+command is a no-op.
 
 Keys:
   Type label    Select monitor immediately when unique

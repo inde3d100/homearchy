@@ -1265,6 +1265,8 @@ hotkeys = { "k" = "action scroll_up", "j" = "action scroll_down" }
 
 Interactive display picking mode. Shows per-monitor overlay badges labelled with selectable characters. Monitors are sorted in a fixed spatial order (top-to-bottom, left-to-right).
 
+On Homearchy this mode is **alpha**: it has not been exercised on a multi-monitor Hyprland session. With one display it is a no-op.
+
 **Platforms:** macOS · Linux. Not implemented on Windows.
 
 | Option       | Type   | Default       | Description                        |
