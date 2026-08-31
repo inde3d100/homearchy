@@ -15,6 +15,7 @@
 - Bound `Super+Shift+Escape` as an emergency overlay cancel, and stopped a Wayland capture race that could freeze the session until reboot.
 - Bound `Space` to left-click and `Enter` to right-click in grid and recursive grid, then return to idle.
 - Inverted scroll on Omarchy so vim `j`/`k` match down/up.
+- From scroll, the grid and recursive-grid shortcuts switch modes without Escape first. Repo default chords stay Super+Shift.
 - On Hyprland, scroll at the window under the cursor without a prior trackpad move: the virtual pointer now forces a hit-test, scroll mode does not map the overlay layer, and a second Super+Z does not tear down the keyboard grab.
 - On Hyprland, read the focused window from `hyprctl` when the Wayland foreign-toplevel protocol does not report one, so hints can label the active app.
 - On Chromium-style apps that expose extra untitled AT-SPI frames, pick the unique named or active window of the focused app so hints still appear.

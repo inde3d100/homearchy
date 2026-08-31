@@ -71,9 +71,19 @@ func (h *handlerState) syncModifierPassthrough(mode domain.Mode) {
 //
 // Caller must hold h.mu.
 func (h *handlerState) passthroughEnabledFor(mode domain.Mode) bool {
-	return h.config != nil &&
-		mode != domain.ModeIdle &&
-		h.config.General.PassthroughUnboundedKeys
+	if h.config == nil || mode == domain.ModeIdle {
+		return false
+	}
+
+	// Scroll grabs the keyboard, so Hyprland never sees Super+D / Super+Shift+J
+	// unless unbound modifier chords are re-injected. Bound [hotkeys] stay on
+	// the blacklist and still run inside Homearchy. Other modes keep the
+	// general passthrough setting.
+	if mode == domain.ModeScroll {
+		return true
+	}
+
+	return h.config.General.PassthroughUnboundedKeys
 }
 
 // RefreshPassthroughForFocusedAppChange re-synchronizes the event tap with the

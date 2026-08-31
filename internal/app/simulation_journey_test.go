@@ -1497,6 +1497,33 @@ func TestSimulation_ModeSwitchNeverDropsTheKeyboard(t *testing.T) {
 	}
 }
 
+// TestSimulation_ScrollModeGridShortcutOpensGrid pins the Linux grab path:
+// Super (or Primary+Shift) grid chords arrive as keys, not as the OS hotkey
+// callback, so HandleKeyPress has to run the global [hotkeys] binding.
+func TestSimulation_ScrollModeGridShortcutOpensGrid(t *testing.T) {
+	sim := newSimHarness(t, simConfig(), nil)
+
+	sim.pressHotkey(scrollHotkey)
+	sim.waitMode(domain.ModeScroll)
+	sim.waitFor("the mode taking keystrokes", sim.tap.IsEnabled)
+
+	sim.press(gridHotkey)
+	sim.waitMode(domain.ModeGrid)
+}
+
+// TestSimulation_ScrollModeRecursiveGridShortcutOpensRecursiveGrid is the
+// same grab path for recursive grid.
+func TestSimulation_ScrollModeRecursiveGridShortcutOpensRecursiveGrid(t *testing.T) {
+	sim := newSimHarness(t, simConfig(), nil)
+
+	sim.pressHotkey(scrollHotkey)
+	sim.waitMode(domain.ModeScroll)
+	sim.waitFor("the mode taking keystrokes", sim.tap.IsEnabled)
+
+	sim.press(recursiveGridHotkey)
+	sim.waitMode(domain.ModeRecursiveGrid)
+}
+
 // TestSimulation_KeyPressedDuringAModeSwitchLandsInTheNewMode is the reporter's
 // original ask, which the two tests around this one do not actually cover:
 // "I would at least like it if those inputs are delayed than if they are

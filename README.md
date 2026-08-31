@@ -53,7 +53,7 @@ Hints, searchable hints, grid, and recursive grid left-click the final selection
 
 Hints label buttons and fields in the focused window. They need that window to speak AT-SPI; Chromium, Firefox, GTK, and Qt apps usually do. If Super+Shift+H or Super+Shift+U appear to do nothing, the shortcut fired but no labels were found — try a Chromium or terminal window, then `homearchy doctor`.
 
-Scroll mode uses vim keys with Omarchy's inverted wheel: `j` down, `k` up, `h` left, `l` right.
+Scroll mode uses vim keys with Omarchy's inverted wheel: `j` down, `k` up, `h` left, `l` right. The grid and recursive-grid shortcuts still work from scroll: they switch modes without Escape first.
 
 Monitor selection is **alpha**. It has not been exercised on a multi-monitor Hyprland session. With one display the mode is a no-op.
 
