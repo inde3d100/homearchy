@@ -76,7 +76,10 @@ Item {
       "\"Space\" = [\"action left_click\", \"idle\"]\n" +
       "\"Return\" = [\"action right_click\", \"idle\"]\n\n" +
       "[scroll]\n" +
-      "invert_scroll = true\n"
+      "invert_scroll = true\n\n" +
+      "[scroll.hotkeys]\n" +
+      "\"Super+Shift+J\" = \"grid --action left_click\"\n" +
+      "\"Super+Shift+R\" = \"recursive_grid --action left_click\"\n"
   }
 
   function writeConfig() {

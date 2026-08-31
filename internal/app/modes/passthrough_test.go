@@ -32,6 +32,30 @@ func TestModeModifierKeys_HintsIncludesModifierHotkeys(t *testing.T) {
 	}
 }
 
+func TestPassthroughEnabledFor_ScrollHandsUnboundModifierChordsThrough(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.DefaultConfig()
+	appState := state.NewAppState()
+	handler := newHandlerWithState(handlerState{
+		config:   cfg,
+		logger:   zap.NewNop(),
+		appState: appState,
+	})
+
+	if !handler.passthroughEnabledFor(domain.ModeScroll) {
+		t.Fatal("scroll consumed unbound Super chords, so Hyprland grid binds could not fire")
+	}
+
+	if handler.passthroughEnabledFor(domain.ModeGrid) {
+		t.Fatal("grid enabled modifier passthrough without PassthroughUnboundedKeys")
+	}
+
+	if handler.passthroughEnabledFor(domain.ModeIdle) {
+		t.Fatal("idle enabled modifier passthrough")
+	}
+}
+
 func TestModeModifierKeys_ScrollIncludesOnlyModifierHotkeys(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.Scroll.Hotkeys = map[string]config.StringOrStringArray{
