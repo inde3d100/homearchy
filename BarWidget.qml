@@ -139,7 +139,7 @@ BarWidget {
           }
           Button {
             width: Style.space(148)
-            text: "Monitor"
+            text: "Monitor (alpha)"
             iconText: "󰍹"
             foreground: root.bar.foreground
             enabled: root.engineReady

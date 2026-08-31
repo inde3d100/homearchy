@@ -1,6 +1,6 @@
 # Homearchy
 
-Keyboard-driven navigation for [Omarchy](https://omarchy.org). Homearchy adds screen-wide hints, search, grid navigation, recursive grid navigation, vim-style scrolling, monitor selection, and an optional Omarchy bar widget.
+Keyboard-driven navigation for [Omarchy](https://omarchy.org). Homearchy adds screen-wide hints, search, grid navigation, recursive grid navigation, vim-style scrolling, monitor selection (alpha), and an optional Omarchy bar widget.
 
 Click the bar icon to open every mode, including how to configure hotkeys. Grid covers the whole screen with typeable cells. Recursive grid starts coarser, then zooms into the cell you type.
 
@@ -40,7 +40,7 @@ The plugin starts and supervises the engine through Omarchy Shell. No separate s
 | `Super+Shift+J` | Grid |
 | `Super+Shift+R` | Recursive grid |
 | `Super+Shift+Z` | Scroll mode |
-| `Super+Shift+I` | Monitor selection |
+| `Super+Shift+I` | Monitor selection (alpha) |
 | `Super+Shift+Escape` | Cancel overlay / return to idle |
 
 The shortcuts are configurable. Open **Configure hotkeys** from the bar menu, or edit the managed Homearchy block in `~/.config/hypr/bindings.lua`, then reload Hyprland with `hyprctl reload`. Keep the `[hotkeys]` table in `Service.qml` `generatedConfig()` on the same chords and restart the plugin so the engine matches:
@@ -54,6 +54,8 @@ Hints, searchable hints, grid, and recursive grid left-click the final selection
 Hints label buttons and fields in the focused window. They need that window to speak AT-SPI; Chromium, Firefox, GTK, and Qt apps usually do. If Super+Shift+H or Super+Shift+U appear to do nothing, the shortcut fired but no labels were found — try a Chromium or terminal window, then `homearchy doctor`.
 
 Scroll mode uses vim keys with Omarchy's inverted wheel: `j` down, `k` up, `h` left, `l` right.
+
+Monitor selection is **alpha**. It has not been exercised on a multi-monitor Hyprland session. With one display the mode is a no-op.
 
 Remove only Homearchy's managed bindings with:
 
