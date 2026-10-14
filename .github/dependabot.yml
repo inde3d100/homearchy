@@ -11,9 +11,3 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly" # Check for updates weekly
-
-  # Enable Dependabot updates for Nix Flakes
-  - package-ecosystem: "nix"
-    directory: "/"
-    schedule:
-      interval: "weekly" # Check for updates weekly
