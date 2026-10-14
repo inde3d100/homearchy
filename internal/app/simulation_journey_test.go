@@ -11,6 +11,7 @@ import (
 	"image"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -520,17 +521,24 @@ func TestSimulation_ScrollJourney(t *testing.T) {
 }
 
 // TestSimulation_ModeIndicatorDisappearsWhenModeExits pins what a user sees
-// after leaving a mode: the indicator that named it is gone. Scroll mode is
-// the one whose indicator is on by default.
+// after leaving a mode: the indicator that named it is gone.
+//
+// It drives grid with its indicator switched on. Scroll, the one mode whose
+// indicator is on by default, shows none on Linux (see
+// TestSimulation_ScrollModeShowsNoIndicatorOnLinux), and grid runs the same
+// polling and teardown on every platform.
 //
 // The indicator is driven by a polling goroutine racing mode teardown, which
 // is exactly how one used to be left behind on screen, so this asserts the
 // visibility the app last asked for rather than any single call.
 func TestSimulation_ModeIndicatorDisappearsWhenModeExits(t *testing.T) {
-	sim := newSimHarness(t, simConfig(), nil)
+	cfg := simConfig()
+	cfg.ModeIndicator.Grid.Enabled = true
 
-	sim.pressHotkey(scrollHotkey)
-	sim.waitMode(domain.ModeScroll)
+	sim := newSimHarness(t, cfg, nil)
+
+	sim.pressHotkey(gridHotkey)
+	sim.waitMode(domain.ModeGrid)
 
 	sim.waitFor("mode indicator shown", func() bool {
 		visible, asked := sim.overlay.indicatorVisibility(ports.ModeIndicator)
@@ -553,6 +561,29 @@ func TestSimulation_ModeIndicatorDisappearsWhenModeExits(t *testing.T) {
 
 	if visible, _ := sim.overlay.indicatorVisibility(ports.ModeIndicator); visible {
 		t.Fatal("mode indicator was shown again after the mode exited")
+	}
+}
+
+// TestSimulation_ScrollModeShowsNoIndicatorOnLinux pins the trade scroll makes
+// on Linux: its indicator is a badge on the shared fullscreen overlay, and
+// mapping that layer on Hyprland takes pointer focus from the window j/k has
+// to scroll. So scroll never asks for its indicator there, even though the
+// indicator is on by default.
+func TestSimulation_ScrollModeShowsNoIndicatorOnLinux(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("scroll shows its indicator on every platform except Linux")
+	}
+
+	sim := newSimHarness(t, simConfig(), nil)
+
+	sim.pressHotkey(scrollHotkey)
+	sim.waitMode(domain.ModeScroll)
+
+	// Long enough for the polling goroutine to have shown it, were it running.
+	time.Sleep(4 * indicatorSettleWindow)
+
+	if visible, _ := sim.overlay.indicatorVisibility(ports.ModeIndicator); visible {
+		t.Fatal("scroll mode asked for its indicator on Linux")
 	}
 }
 

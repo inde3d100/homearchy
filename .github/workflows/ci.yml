@@ -19,7 +19,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            just \
             libcairo2-dev \
             libwayland-dev \
             libx11-dev \
@@ -34,6 +33,11 @@ jobs:
             libtesseract-dev \
             tesseract-ocr-eng \
             libpipewire-0.3-dev
+
+      - name: Install just (current version; the Ubuntu package is too old for the justfile's [doc] attribute)
+        uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2
+        with:
+          tool: just
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
